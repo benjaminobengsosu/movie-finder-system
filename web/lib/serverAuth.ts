@@ -67,6 +67,30 @@ function getCloud(): SupabaseClient {
   return cloudClient;
 }
 
+let cloudSeeded = false;
+
+/**
+ * Android parity: a freshly deployed cloud database starts empty, so the demo
+ * identities and a baseline restore point are inserted on first use. Upsert on
+ * email keeps concurrent serverless cold starts from duplicating rows.
+ */
+async function ensureCloudSeeded(): Promise<void> {
+  if (cloudSeeded) return;
+  const cloud = getCloud();
+  const { count, error } = await cloud.from('users').select('id', { count: 'exact', head: true });
+  if (error) return;
+  if (!count) {
+    await cloud.from('users').upsert(buildDemoUsers(), { onConflict: 'email' });
+  }
+  const { count: pointCount, error: pointError } = await cloud
+    .from('config_restore_points')
+    .select('id', { count: 'exact', head: true });
+  if (!pointError && !pointCount) {
+    await cloud.from('config_restore_points').insert([buildBaselineRestorePoint()]);
+  }
+  cloudSeeded = true;
+}
+
 export function safeUser(u: UserRecord) {
   const { salt, password_hash, two_factor_secret, recovery_codes, ...safe } = u;
   return safe;
@@ -84,6 +108,13 @@ interface LocalDb {
   deletedRecords: DeletedRecordRow[];
   restorePoints: RestorePointRow[];
 }
+
+const DEMO_USER_SPEC: Array<[string, string, string]> = [
+  ['Administrator', 'admin@moviefinder.com', 'Administrator'],
+  ['Operations Manager', 'manager@moviefinder.com', 'Manager'],
+  ['Content Inputer', 'inputer@moviefinder.com', 'Content Inputer'],
+  ['Standard User', 'user@moviefinder.com', 'Standard User']
+];
 
 function buildSeedUser(name: string, email: string, role: string): UserRecord {
   const salt = generateSalt();
@@ -104,36 +135,44 @@ function buildSeedUser(name: string, email: string, role: string): UserRecord {
   };
 }
 
+function buildDemoUsers(): UserRecord[] {
+  return DEMO_USER_SPEC.map(([name, email, role]) => buildSeedUser(name, email, role));
+}
+
+function buildBaselineRestorePoint(): RestorePointRow {
+  return {
+    id: randomUUID(),
+    name: 'System Baseline Configuration',
+    theme: 'Dark Obsidian',
+    maintenance_mode: false,
+    guest_mode_enabled: true,
+    announcement_text: 'Welcome to Movie Finder Enterprise Security & Cloud Hub.',
+    security_strictness: 'High',
+    created_at: Date.now(),
+    created_by_email: 'admin@moviefinder.com'
+  };
+}
+
 async function seedLocalDb(): Promise<LocalDb> {
   const db: LocalDb = {
-    users: [
-      buildSeedUser('Administrator', 'admin@moviefinder.com', 'Administrator'),
-      buildSeedUser('Operations Manager', 'manager@moviefinder.com', 'Manager'),
-      buildSeedUser('Content Inputer', 'inputer@moviefinder.com', 'Content Inputer'),
-      buildSeedUser('Standard User', 'user@moviefinder.com', 'Standard User')
-    ],
+    users: buildDemoUsers(),
     deletedRecords: [],
-    restorePoints: [
-      {
-        id: randomUUID(),
-        name: 'System Baseline Configuration',
-        theme: 'Dark Obsidian',
-        maintenance_mode: false,
-        guest_mode_enabled: true,
-        announcement_text: 'Welcome to Movie Finder Enterprise Security & Cloud Hub.',
-        security_strictness: 'High',
-        created_at: Date.now(),
-        created_by_email: 'admin@moviefinder.com'
-      }
-    ]
+    restorePoints: [buildBaselineRestorePoint()]
   };
   await writeLocalDb(db);
   return db;
 }
 
+let memoryDb: LocalDb | null = null;
+
 async function writeLocalDb(db: LocalDb) {
-  await fs.mkdir(LOCAL_DB_DIR, { recursive: true });
-  await fs.writeFile(LOCAL_DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+  memoryDb = db;
+  try {
+    await fs.mkdir(LOCAL_DB_DIR, { recursive: true });
+    await fs.writeFile(LOCAL_DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Local DB persist skipped (read-only filesystem):', (err as Error).message);
+  }
 }
 
 async function readLocalDb(): Promise<LocalDb> {
@@ -142,32 +181,18 @@ async function readLocalDb(): Promise<LocalDb> {
     const db = JSON.parse(raw) as LocalDb;
     let changed = false;
     if (!Array.isArray(db.users) || db.users.length === 0) {
-      db.users = [
-        buildSeedUser('Administrator', 'admin@moviefinder.com', 'Administrator'),
-        buildSeedUser('Operations Manager', 'manager@moviefinder.com', 'Manager'),
-        buildSeedUser('Content Inputer', 'inputer@moviefinder.com', 'Content Inputer'),
-        buildSeedUser('Standard User', 'user@moviefinder.com', 'Standard User')
-      ];
+      db.users = buildDemoUsers();
       changed = true;
     }
     if (!Array.isArray(db.deletedRecords)) { db.deletedRecords = []; changed = true; }
     if (!Array.isArray(db.restorePoints) || db.restorePoints.length === 0) {
-      db.restorePoints = [{
-        id: randomUUID(),
-        name: 'System Baseline Configuration',
-        theme: 'Dark Obsidian',
-        maintenance_mode: false,
-        guest_mode_enabled: true,
-        announcement_text: 'Welcome to Movie Finder Enterprise Security & Cloud Hub.',
-        security_strictness: 'High',
-        created_at: Date.now(),
-        created_by_email: 'admin@moviefinder.com'
-      }];
+      db.restorePoints = [buildBaselineRestorePoint()];
       changed = true;
     }
     if (changed) await writeLocalDb(db);
     return db;
   } catch {
+    if (memoryDb) return memoryDb;
     return seedLocalDb();
   }
 }
@@ -178,6 +203,7 @@ async function readLocalDb(): Promise<LocalDb> {
 
 export async function listUsers(): Promise<UserRecord[]> {
   if (authMode === 'cloud') {
+    await ensureCloudSeeded();
     const { data, error } = await getCloud().from('users').select('*').order('created_at', { ascending: false });
     if (!error && data) return data as UserRecord[];
     console.warn('Supabase users read failed, using local store:', error?.message);
@@ -189,6 +215,7 @@ export async function listUsers(): Promise<UserRecord[]> {
 export async function findUserByEmail(email: string): Promise<UserRecord | null> {
   const needle = email.trim().toLowerCase();
   if (authMode === 'cloud') {
+    await ensureCloudSeeded();
     const { data, error } = await getCloud().from('users').select('*').eq('email', needle).maybeSingle();
     if (!error && data) return data as UserRecord;
   }
