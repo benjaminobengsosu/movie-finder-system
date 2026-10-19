@@ -1,0 +1,6 @@
+{
+  "name": "Movie Finder",
+  "description": "Scan or upload movie scenes to automatically identify film title, year, director, and IMDb page, with interactive search history and PDF exporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

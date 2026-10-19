@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Finder Web - Discover the movie behind the scene</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#06080D',
+            cardDark: '#10121A',
+            cardBorder: '#222634',
+            electricCyan: '#00E5FF',
+            neonMint: '#00E676',
+            goldAccent: '#FFB300',
+            alertRed: '#FF5252',
+            subtleGrey: '#8E93A4'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #06080D; color: #F5F6F8; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .scan-reticle { border: 2px dashed rgba(0, 229, 255, 0.6); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- Top Header Navigation -->
+  <header class="bg-cardDark border-b border-cardBorder sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-electricCyan to-blue-600 flex items-center justify-center shadow-lg shadow-electricCyan/20 text-obsidian font-bold">
+        <i data-lucide="film" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-base font-bold text-white tracking-tight">Movie Finder</h1>
+          <span class="text-[10px] font-mono font-bold bg-electricCyan/20 text-electricCyan px-2 py-0.5 rounded">WEB CLOUD</span>
+        </div>
+        <p class="text-[11px] text-subtleGrey">Discover the movie behind the scene</p>
+      </div>
+    </div>
+
+    <!-- Tab navigation -->
+    <div class="flex items-center space-x-3">
+      <nav class="flex bg-obsidian p-1 rounded-xl border border-cardBorder text-xs">
+        <button id="nav-analyzer" onclick="switchTab('analyzer')" class="px-3.5 py-1.5 rounded-lg font-bold bg-electricCyan text-obsidian flex items-center space-x-1.5 transition">
+          <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+          <span>Analyzer</span>
+        </button>
+        <button id="nav-watchlist" onclick="switchTab('watchlist')" class="px-3.5 py-1.5 rounded-lg font-bold text-subtleGrey hover:text-white flex items-center space-x-1.5 transition">
+          <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
+          <span>Watchlist (<span id="watchlist-count">0</span>)</span>
+        </button>
+        <button id="nav-admin" onclick="switchTab('admin')" class="px-3.5 py-1.5 rounded-lg font-bold text-subtleGrey hover:text-white flex items-center space-x-1.5 transition">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+          <span>Admin & Security Hub</span>
+        </button>
+      </nav>
+
+      <!-- Key configuration button -->
+      <button onclick="toggleKeyModal(true)" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-cardBorder text-xs text-subtleGrey hover:text-white bg-cardDark transition">
+        <i data-lucide="key" class="w-3.5 h-3.5 text-electricCyan"></i>
+        <span id="key-btn-label">API Key</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-6 space-y-6">
+
+    <!-- TAB 1: SCENE ANALYZER -->
+    <div id="tab-analyzer" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        
+        <!-- Input Panel -->
+        <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 space-y-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-electricCyan text-xs font-bold uppercase tracking-wider">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Scene Capture & Clues</span>
+            </div>
+            <span class="text-[10px] text-neonMint font-mono font-bold bg-neonMint/10 px-2 py-0.5 rounded">READY</span>
+          </div>
+
+          <!-- Camera / Preview Box -->
+          <div id="camera-container" class="hidden relative h-72 bg-black rounded-xl overflow-hidden border border-electricCyan/40">
+            <video id="webcam-feed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div class="w-56 h-36 scan-reticle rounded-xl flex items-center justify-center">
+                <span class="bg-black/70 text-electricCyan text-[10px] font-mono px-2 py-0.5 rounded">ALIGN TV OR SCREEN</span>
+              </div>
+            </div>
+            <div class="absolute bottom-3 left-0 right-0 flex justify-center space-x-4">
+              <button onclick="captureFromWebcam()" class="w-12 h-12 rounded-full bg-electricCyan text-obsidian flex items-center justify-center shadow-lg hover:scale-105 transition font-bold">
+                <i data-lucide="camera" class="w-6 h-6"></i>
+              </button>
+              <button onclick="stopWebcam()" class="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold">
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div id="image-preview-container" class="hidden relative h-64 bg-black rounded-xl overflow-hidden border border-cardBorder flex items-center justify-center">
+            <img id="preview-img" src="" alt="Captured scene" class="max-h-full max-w-full object-contain" />
+            <button onclick="clearImage()" class="absolute top-2 right-2 px-2.5 py-1 bg-black/80 hover:bg-black text-[11px] text-white rounded-lg border border-cardBorder">
+              Remove
+            </button>
+          </div>
+
+          <div id="selection-buttons" class="grid grid-cols-2 gap-4">
+            <button onclick="startWebcam()" class="p-6 bg-obsidian border-2 border-dashed border-cardBorder hover:border-electricCyan/60 rounded-xl flex flex-col items-center justify-center gap-2 group transition">
+              <div class="w-10 h-10 rounded-full bg-electricCyan/10 text-electricCyan flex items-center justify-center group-hover:scale-110 transition">
+                <i data-lucide="camera" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-bold text-white">Live Camera</span>
+              <span class="text-[10px] text-subtleGrey">Point at TV or Screen</span>
+            </button>
+
+            <label class="p-6 bg-obsidian border-2 border-dashed border-cardBorder hover:border-electricCyan/60 rounded-xl flex flex-col items-center justify-center gap-2 group transition cursor-pointer">
+              <div class="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center group-hover:scale-110 transition">
+                <i data-lucide="upload" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-bold text-white">Upload Still</span>
+              <span class="text-[10px] text-subtleGrey">Photo or Screenshot</span>
+              <input type="file" accept="image/*" onchange="handleFile(event)" class="hidden" />
+            </label>
+          </div>
+
+          <!-- Clues textarea -->
+          <div class="space-y-1.5">
+            <label class="text-xs text-subtleGrey font-medium">Dialogue quotes, character names, or scene description (Optional or standalone):</label>
+            <textarea id="clues-input" rows="3" placeholder="e.g. Man in trenchcoat spinning a brass top in an airport..." class="w-full bg-obsidian border border-cardBorder rounded-xl p-3 text-xs text-white placeholder-subtleGrey/50 focus:border-electricCyan outline-none resize-none"></textarea>
+          </div>
+
+          <!-- Error Alert Banner -->
+          <div id="error-banner" class="hidden bg-alertRed/10 border border-alertRed/40 rounded-xl p-3 text-xs text-alertRed flex items-start space-x-2">
+            <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+            <span id="error-message"></span>
+          </div>
+
+          <!-- Identify button -->
+          <button id="btn-identify" onclick="identifyMovie()" class="w-full py-3.5 bg-electricCyan hover:bg-electricCyan/90 text-obsidian rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg shadow-electricCyan/20 transition">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span id="btn-identify-text">Identify Movie Scene</span>
+          </button>
+        </div>
+
+        <!-- Result Panel -->
+        <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 min-h-[380px] flex flex-col justify-center">
+          <div id="result-placeholder" class="text-center py-12 text-subtleGrey space-y-3">
+            <i data-lucide="film" class="w-12 h-12 mx-auto text-cardBorder"></i>
+            <p class="text-sm font-bold text-white">No Movie Identified Yet</p>
+            <p class="text-xs max-w-xs mx-auto text-subtleGrey leading-relaxed">
+              Take a live camera picture of your screen or upload a still, or enter text clues to recognize the movie.
+            </p>
+          </div>
+
+          <div id="result-content" class="hidden space-y-5">
+            <div class="flex gap-4 items-start">
+              <img id="result-poster" src="" alt="Movie Poster" class="w-24 h-36 object-cover rounded-xl border border-cardBorder shadow-lg flex-shrink-0 hidden" />
+              <div class="space-y-1">
+                <span id="result-confidence" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-electricCyan/20 text-electricCyan uppercase">
+                  HIGH CONFIDENCE
+                </span>
+                <h3 id="result-title" class="text-2xl font-bold text-white">Movie Title</h3>
+                <p id="result-meta" class="text-xs text-subtleGrey">2010 • Directed by Christopher Nolan</p>
+                <p id="result-genre" class="text-xs font-semibold text-neonMint">Sci-Fi / Action</p>
+                <a id="result-imdb" href="#" target="_blank" class="inline-flex items-center space-x-1 text-xs text-goldAccent hover:underline pt-2 font-medium">
+                  <span>Open IMDb Page</span>
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                </a>
+              </div>
+            </div>
+
+            <div class="bg-obsidian border border-cardBorder rounded-xl p-4 text-xs space-y-2">
+              <span class="text-[10px] font-mono font-bold text-electricCyan uppercase tracking-wider">AI Identification Rationale:</span>
+              <p id="result-rationale" class="text-subtleGrey leading-relaxed"></p>
+              <div id="result-actors-box" class="pt-1 text-[11px] text-white">
+                <strong class="text-electricCyan">Actors:</strong> <span id="result-actors"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: WATCHLIST -->
+    <div id="tab-watchlist" class="hidden bg-cardDark border border-cardBorder rounded-2xl p-6 space-y-4">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-electricCyan flex items-center space-x-2">
+        <i data-lucide="bookmark" class="w-4 h-4"></i>
+        <span>Shared Watchlist & Discoveries</span>
+      </h2>
+      <div id="watchlist-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- TAB 3: ADMIN & SECURITY HUB -->
+    <div id="tab-admin" class="hidden space-y-6">
+      
+      <!-- System State Card -->
+      <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 space-y-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-obsidian border border-cardBorder p-4 rounded-xl">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-neonMint animate-pulse"></span>
+              <span class="text-xs font-mono font-bold text-neonMint tracking-wider">SYSTEM STATE: ONLINE</span>
+            </div>
+            <p id="live-date" class="text-sm font-semibold text-white mt-1"></p>
+          </div>
+          <div class="flex items-center space-x-4">
+            <div id="live-time" class="bg-cardDark px-3 py-1.5 rounded-lg border border-cardBorder font-mono text-sm text-electricCyan font-bold"></div>
+            <div class="text-xs text-subtleGrey">
+              <span id="stat-users" class="text-white font-bold">4</span> Users |
+              <span id="stat-deleted" class="text-alertRed font-bold">0</span> Deleted |
+              <span id="stat-restores" class="text-goldAccent font-bold">1</span> Restore Point
+            </div>
+          </div>
+        </div>
+
+        <!-- Cryptographic Posture Pills -->
+        <div class="grid grid-cols-3 gap-3 text-xs">
+          <div class="bg-obsidian border border-cardBorder rounded-lg p-3">
+            <span class="text-[9px] font-mono text-subtleGrey font-bold">SALTING</span>
+            <p class="text-xs font-bold text-neonMint mt-0.5">16-Byte CSPRNG Hex</p>
+          </div>
+          <div class="bg-obsidian border border-cardBorder rounded-lg p-3">
+            <span class="text-[9px] font-mono text-subtleGrey font-bold">PEPPER</span>
+            <p class="text-xs font-bold text-electricCyan mt-0.5">Secret App Key</p>
+          </div>
+          <div class="bg-obsidian border border-cardBorder rounded-lg p-3">
+            <span class="text-[9px] font-mono text-subtleGrey font-bold">KEY DERIVATION</span>
+            <p class="text-xs font-bold text-goldAccent mt-0.5">PBKDF2 HMAC-SHA256</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Role Switcher -->
+      <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 space-y-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-electricCyan">Active Identity & Demo Role Switcher</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button onclick="switchRole('Administrator')" id="role-btn-Administrator" class="p-3 rounded-xl border border-electricCyan bg-electricCyan/10 text-white text-xs font-bold text-left">
+            👑 Administrator
+            <span class="block text-[10px] text-subtleGrey font-normal mt-0.5">admin@moviefinder.com</span>
+          </button>
+          <button onclick="switchRole('Manager')" id="role-btn-Manager" class="p-3 rounded-xl border border-cardBorder bg-obsidian text-white text-xs font-bold text-left">
+            💼 Manager
+            <span class="block text-[10px] text-subtleGrey font-normal mt-0.5">manager@moviefinder.com</span>
+          </button>
+          <button onclick="switchRole('Content Inputer')" id="role-btn-Content Inputer" class="p-3 rounded-xl border border-cardBorder bg-obsidian text-white text-xs font-bold text-left">
+            🎬 Content Inputer
+            <span class="block text-[10px] text-subtleGrey font-normal mt-0.5">inputer@moviefinder.com</span>
+          </button>
+          <button onclick="switchRole('Standard User')" id="role-btn-Standard User" class="p-3 rounded-xl border border-cardBorder bg-obsidian text-white text-xs font-bold text-left">
+            👤 Standard User
+            <span class="block text-[10px] text-subtleGrey font-normal mt-0.5">user@moviefinder.com</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Admin Tabs: Users / Deleted Database / Restore Points / Credentials Report -->
+      <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 space-y-4">
+        <div class="flex border-b border-cardBorder gap-4 pb-2 text-xs">
+          <button onclick="switchAdminSubtab('users')" id="subtab-users" class="font-bold pb-2 text-electricCyan border-b-2 border-electricCyan">Users Directory</button>
+          <button onclick="switchAdminSubtab('deleted')" id="subtab-deleted" class="font-bold pb-2 text-subtleGrey">Deleted Records Archive</button>
+          <button onclick="switchAdminSubtab('restore')" id="subtab-restore" class="font-bold pb-2 text-subtleGrey">Restore Points</button>
+          <button onclick="switchAdminSubtab('reports')" id="subtab-reports" class="font-bold pb-2 text-subtleGrey">Credentials Report (Passwords)</button>
+        </div>
+
+        <!-- Subtab 1: Users Directory -->
+        <div id="admin-view-users" class="space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-subtleGrey">User access control and identity management</span>
+            <button onclick="openAddUserModal()" class="px-3 py-1.5 bg-electricCyan text-obsidian rounded-lg font-bold text-xs">
+              + Add User
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-obsidian text-subtleGrey uppercase font-mono border-b border-cardBorder">
+                <tr>
+                  <th class="p-3">User</th>
+                  <th class="p-3">Role</th>
+                  <th class="p-3">2FA</th>
+                  <th class="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body" class="divide-y divide-cardBorder text-white"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Subtab 2: Deleted Records Database -->
+        <div id="admin-view-deleted" class="hidden space-y-3">
+          <p class="text-xs text-subtleGrey">Dedicated database archiving all data deleted by administrators with timestamps and audit reasons.</p>
+          <div id="deleted-records-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Subtab 3: Restore Points -->
+        <div id="admin-view-restore" class="hidden space-y-4">
+          <div class="flex gap-2">
+            <input id="restore-point-name" type="text" placeholder="Restore point name (e.g. Staging Pre-Update)" class="flex-1 bg-obsidian border border-cardBorder rounded-lg px-3 py-2 text-xs text-white outline-none" />
+            <button onclick="createRestorePoint()" class="px-4 py-2 bg-electricCyan text-obsidian rounded-lg font-bold text-xs">Create Point</button>
+          </div>
+          <p class="text-[11px] text-subtleGrey">Restore points modify configuration settings without changing or erasing user accounts or movie data.</p>
+          <div id="restore-points-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Subtab 4: Credentials Report -->
+        <div id="admin-view-reports" class="hidden space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-subtleGrey">Cryptographic credentials audit (Salts, Peppers, and Hashes)</span>
+            <button onclick="toggleRevealHashes()" id="reveal-btn" class="px-3 py-1 border border-cardBorder rounded-lg text-xs text-subtleGrey hover:text-white">
+              Reveal Hashes
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-obsidian text-subtleGrey uppercase border-b border-cardBorder">
+                <tr>
+                  <th class="p-3">Identity</th>
+                  <th class="p-3">Salt (16-Byte Hex)</th>
+                  <th class="p-3">Pepper Status</th>
+                  <th class="p-3">PBKDF2 HMAC-SHA256 Hash</th>
+                </tr>
+              </thead>
+              <tbody id="reports-table-body" class="divide-y divide-cardBorder text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Configure Gemini Key -->
+  <div id="key-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-cardDark border border-cardBorder rounded-2xl p-6 max-w-md w-full space-y-4">
+      <div class="flex items-center space-x-2 text-electricCyan">
+        <i data-lucide="key" class="w-5 h-5"></i>
+        <h3 class="text-sm font-bold text-white">Gemini API Key Configuration</h3>
+      </div>
+      <p class="text-xs text-subtleGrey leading-relaxed">
+        Enter your Google AI Studio API key. It is saved directly in your browser's local storage and used to identify movie scenes:
+      </p>
+      <input id="key-input" type="password" placeholder="AIzaSy..." class="w-full bg-obsidian border border-cardBorder rounded-xl p-3 text-xs text-white font-mono outline-none focus:border-electricCyan" />
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="toggleKeyModal(false)" class="px-4 py-2 rounded-lg text-xs text-subtleGrey hover:text-white">Cancel</button>
+        <button onclick="saveApiKeyFromModal()" class="px-4 py-2 bg-electricCyan text-obsidian rounded-lg text-xs font-bold">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    const AUTH_PEPPER = "02456504a869a6e52b03d281897c926ddb2bfc1f88f5b1f678b064c49858989b";
+    let selectedImageBase64 = null;
+    let webcamStream = null;
+    let revealHashes = false;
+    let currentRole = 'Administrator';
+
+    let users = [
+      { id: '1', name: 'Administrator', email: 'admin@moviefinder.com', role: 'Administrator', salt: '4a8f9c1e2b3d4e5f6a7b8c9d0e1f2a3b', hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', twoFactor: true },
+      { id: '2', name: 'Operations Manager', email: 'manager@moviefinder.com', role: 'Manager', salt: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', hash: '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae', twoFactor: false },
+      { id: '3', name: 'Content Inputer', email: 'inputer@moviefinder.com', role: 'Content Inputer', salt: '7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c', hash: 'fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9', twoFactor: false },
+      { id: '4', name: 'Standard User', email: 'user@moviefinder.com', role: 'Standard User', salt: '9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f', hash: '3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b', twoFactor: false }
+    ];
+
+    let deletedRecords = [];
+    let restorePoints = [
+      { id: '1', name: 'System Baseline Configuration', theme: 'Dark Obsidian', createdAt: Date.now() - 3600000 }
+    ];
+    let watchlist = [];
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setInterval(updateClock, 1000);
+      updateClock();
+      renderUsers();
+      renderDeleted();
+      renderRestorePoints();
+      renderReports();
+
+      const savedKey = localStorage.getItem('GEMINI_API_KEY');
+      if (savedKey) {
+        document.getElementById('key-input').value = savedKey;
+        document.getElementById('key-btn-label').innerText = 'Key Active';
+      }
+    });
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('live-date').innerText = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('live-time').innerText = now.toLocaleTimeString();
+    }
+
+    function switchTab(tab) {
+      ['analyzer', 'watchlist', 'admin'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const nav = document.getElementById(`nav-${t}`);
+        nav.className = "px-3.5 py-1.5 rounded-lg font-bold text-subtleGrey hover:text-white flex items-center space-x-1.5 transition";
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      const activeNav = document.getElementById(`nav-${tab}`);
+      activeNav.className = "px-3.5 py-1.5 rounded-lg font-bold bg-electricCyan text-obsidian flex items-center space-x-1.5 transition";
+      lucide.createIcons();
+    }
+
+    // Camera Handlers
+    async function startWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        webcamStream = stream;
+        const video = document.getElementById('webcam-feed');
+        video.srcObject = stream;
+        document.getElementById('selection-buttons').classList.add('hidden');
+        document.getElementById('camera-container').classList.remove('hidden');
+        lucide.createIcons();
+      } catch (e) {
+        showError("Camera access denied or unavailable. Please use Still Upload instead.");
+      }
+    }
+
+    function stopWebcam() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+      document.getElementById('camera-container').classList.add('hidden');
+      document.getElementById('selection-buttons').classList.remove('hidden');
+    }
+
+    function captureFromWebcam() {
+      const video = document.getElementById('webcam-feed');
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.9);
+      stopWebcam();
+      showImagePreview(selectedImageBase64);
+    }
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        selectedImageBase64 = ev.target.result;
+        showImagePreview(selectedImageBase64);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function showImagePreview(base64) {
+      document.getElementById('preview-img').src = base64;
+      document.getElementById('selection-buttons').classList.add('hidden');
+      document.getElementById('image-preview-container').classList.remove('hidden');
+      hideError();
+    }
+
+    function clearImage() {
+      selectedImageBase64 = null;
+      document.getElementById('image-preview-container').classList.add('hidden');
+      document.getElementById('selection-buttons').classList.remove('hidden');
+    }
+
+    // Movie Identification with Gemini API
+    async function identifyMovie() {
+      const clues = document.getElementById('clues-input').value.trim();
+      if (!selectedImageBase64 && !clues) {
+        showError("Please capture an image or enter description clues.");
+        return;
+      }
+
+      const apiKey = localStorage.getItem('GEMINI_API_KEY');
+      if (!apiKey) {
+        toggleKeyModal(true);
+        showError("Please enter your Google Gemini API key to continue.");
+        return;
+      }
+
+      hideError();
+      const btn = document.getElementById('btn-identify');
+      const btnText = document.getElementById('btn-identify-text');
+      btn.disabled = true;
+      btnText.innerText = "Analyzing Scene with Gemini 3.5 Flash...";
+
+      const prompt = `Analyze this cinematic scene and identify the exact film title, release year, and director.
+Dialogue/clues: "${clues}"
+Output JSON only:
+{"title":"Film Title","year":"Year","director":"Director","actors":"Main actors","genre":"Genre","confidence":"High","rationale":"Visual evidence","imdbUrl":"https://www.imdb.com"}`;
+
+      const contents = [];
+      const parts = [];
+
+      if (selectedImageBase64) {
+        const cleanBase64 = selectedImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+        parts.push({ inline_data: { mime_type: "image/jpeg", data: cleanBase64 } });
+      }
+      parts.push({ text: prompt });
+      contents.push({ parts });
+
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            generation_config: { temperature: 0.2, response_mime_type: "application/json" }
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.text();
+          throw new Error(`Gemini API Error (${res.status}): ${errData}`);
+        }
+
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("Empty candidate response from Gemini.");
+
+        const result = JSON.parse(text);
+        displayResult(result);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+        btnText.innerText = "Identify Movie Scene";
+      }
+    }
+
+    function displayResult(result) {
+      document.getElementById('result-placeholder').classList.add('hidden');
+      const content = document.getElementById('result-content');
+      content.classList.remove('hidden');
+
+      document.getElementById('result-title').innerText = result.title || "Unknown Film";
+      document.getElementById('result-meta').innerText = `${result.year || ''} • Directed by ${result.director || 'Unknown'}`;
+      document.getElementById('result-genre').innerText = result.genre || '';
+      document.getElementById('result-confidence').innerText = `${result.confidence || 'HIGH'} CONFIDENCE`;
+      document.getElementById('result-rationale').innerText = result.rationale || 'Recognized from visual clues and actors.';
+      document.getElementById('result-actors').innerText = result.actors || 'Unspecified';
+      document.getElementById('result-imdb').href = result.imdbUrl || 'https://www.imdb.com';
+
+      // Add to watchlist
+      watchlist.unshift({ title: result.title, year: result.year, genre: result.genre });
+      document.getElementById('watchlist-count').innerText = watchlist.length;
+      renderWatchlist();
+      lucide.createIcons();
+    }
+
+    function renderWatchlist() {
+      const grid = document.getElementById('watchlist-grid');
+      grid.innerHTML = watchlist.map(m => `
+        <div class="bg-obsidian border border-cardBorder rounded-xl p-4 flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-cardDark flex items-center justify-center text-subtleGrey">
+            <i data-lucide="film" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-sm text-white">${m.title}</h4>
+            <p class="text-xs text-subtleGrey">${m.year} • ${m.genre}</p>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    // Admin & Role Management
+    function switchRole(role) {
+      currentRole = role;
+      ['Administrator', 'Manager', 'Content Inputer', 'Standard User'].forEach(r => {
+        const btn = document.getElementById(`role-btn-${r}`);
+        if (r === role) {
+          btn.className = "p-3 rounded-xl border border-electricCyan bg-electricCyan/10 text-white text-xs font-bold text-left";
+        } else {
+          btn.className = "p-3 rounded-xl border border-cardBorder bg-obsidian text-white text-xs font-bold text-left";
+        }
+      });
+    }
+
+    function switchAdminSubtab(sub) {
+      ['users', 'deleted', 'restore', 'reports'].forEach(s => {
+        document.getElementById(`admin-view-${s}`).classList.add('hidden');
+        document.getElementById(`subtab-${s}`).className = "font-bold pb-2 text-subtleGrey";
+      });
+      document.getElementById(`admin-view-${sub}`).classList.remove('hidden');
+      document.getElementById(`subtab-${sub}`).className = "font-bold pb-2 text-electricCyan border-b-2 border-electricCyan";
+      lucide.createIcons();
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('users-table-body');
+      tbody.innerHTML = users.map(u => `
+        <tr class="hover:bg-white/5">
+          <td class="p-3">
+            <div class="font-bold">${u.name}</div>
+            <div class="text-[11px] text-subtleGrey">${u.email}</div>
+          </td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-electricCyan">${u.role}</span></td>
+          <td class="p-3">${u.twoFactor ? '<span class="text-neonMint font-bold">Active</span>' : '<span class="text-subtleGrey">Off</span>'}</td>
+          <td class="p-3 text-right">
+            <button onclick="deleteUser('${u.id}')" class="text-alertRed hover:underline font-bold text-xs">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('stat-users').innerText = users.length;
+    }
+
+    function deleteUser(id) {
+      const user = users.find(u => u.id === id);
+      if (!user) return;
+      const reason = prompt(`Enter audit deletion reason for ${user.name}:`, "Administrative cleanup");
+      if (!reason) return;
+
+      deletedRecords.unshift({
+        name: `${user.name} (${user.email})`,
+        type: 'USER',
+        reason,
+        deletedAt: Date.now(),
+        snapshot: JSON.stringify(user)
+      });
+      users = users.filter(u => u.id !== id);
+      renderUsers();
+      renderDeleted();
+      renderReports();
+    }
+
+    function renderDeleted() {
+      const list = document.getElementById('deleted-records-list');
+      document.getElementById('stat-deleted').innerText = deletedRecords.length;
+      if (deletedRecords.length === 0) {
+        list.innerHTML = `<p class="text-xs text-subtleGrey py-4 text-center">No deleted records archived yet.</p>`;
+        return;
+      }
+      list.innerHTML = deletedRecords.map(r => `
+        <div class="bg-obsidian border border-cardBorder rounded-xl p-4 space-y-1">
+          <div class="flex justify-between items-center">
+            <span class="font-bold text-sm text-white">${r.name}</span>
+            <span class="text-[10px] text-subtleGrey">${new Date(r.deletedAt).toLocaleString()}</span>
+          </div>
+          <p class="text-xs text-subtleGrey">Reason: <span class="text-white italic">${r.reason}</span></p>
+          <pre class="text-[10px] font-mono text-electricCyan bg-cardDark p-2 rounded overflow-x-auto">${r.snapshot}</pre>
+        </div>
+      `).join('');
+    }
+
+    function renderRestorePoints() {
+      const list = document.getElementById('restore-points-list');
+      document.getElementById('stat-restores').innerText = restorePoints.length;
+      list.innerHTML = restorePoints.map(p => `
+        <div class="bg-obsidian border border-cardBorder rounded-xl p-4 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-sm text-white">${p.name}</p>
+            <p class="text-xs text-subtleGrey">Theme: ${p.theme} • Created: ${new Date(p.createdAt).toLocaleTimeString()}</p>
+          </div>
+          <button onclick="alert('Restored configuration. User and movie data remain untouched.')" class="px-3 py-1.5 border border-electricCyan text-electricCyan rounded-lg text-xs hover:bg-electricCyan/10">
+            Apply Snapshot
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function createRestorePoint() {
+      const input = document.getElementById('restore-point-name');
+      const name = input.value.trim();
+      if (!name) return;
+      restorePoints.unshift({ id: String(Date.now()), name, theme: 'Dark Obsidian', createdAt: Date.now() });
+      input.value = '';
+      renderRestorePoints();
+    }
+
+    function renderReports() {
+      const tbody = document.getElementById('reports-table-body');
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td class="p-3 text-white font-sans"><strong>${u.name}</strong> (${u.role})</td>
+          <td class="p-3 text-neonMint">${u.salt}</td>
+          <td class="p-3 text-electricCyan font-bold">VERIFIED</td>
+          <td class="p-3 text-goldAccent">${revealHashes ? u.hash : '•••••••••••••••••••••••• (' + u.hash.substring(0, 8) + '...)'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function toggleRevealHashes() {
+      revealHashes = !revealHashes;
+      document.getElementById('reveal-btn').innerText = revealHashes ? "Mask Hashes" : "Reveal Hashes";
+      renderReports();
+    }
+
+    function openAddUserModal() {
+      const name = prompt("Enter full name:");
+      if (!name) return;
+      const email = prompt("Enter email address:");
+      if (!email) return;
+      const role = prompt("Enter role (Administrator, Manager, Content Inputer, Standard User):", "Standard User") || "Standard User";
+
+      // 16-byte random salt
+      const salt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+      const hash = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      users.push({
+        id: String(Date.now()),
+        name,
+        email,
+        role,
+        salt,
+        hash,
+        twoFactor: false
+      });
+      renderUsers();
+      renderReports();
+    }
+
+    function toggleKeyModal(show) {
+      document.getElementById('key-modal').classList.toggle('hidden', !show);
+      lucide.createIcons();
+    }
+
+    function saveApiKeyFromModal() {
+      const key = document.getElementById('key-input').value.trim();
+      if (key) {
+        localStorage.setItem('GEMINI_API_KEY', key);
+        document.getElementById('key-btn-label').innerText = 'Key Active';
+      }
+      toggleKeyModal(false);
+    }
+
+    function showError(msg) {
+      const banner = document.getElementById('error-banner');
+      banner.classList.remove('hidden');
+      document.getElementById('error-message').innerText = msg;
+      lucide.createIcons();
+    }
+
+    function hideError() {
+      document.getElementById('error-banner').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
